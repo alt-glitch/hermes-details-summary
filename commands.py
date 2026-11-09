@@ -80,6 +80,10 @@ def _read_file(path: str, cwd: str) -> BodyRef:
         p = Path(cwd or os.getcwd()) / p
     try:
         return BodyRef(f"body file {p}", text=p.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return BodyRef(where, unreadable=f"The body file {p} does not exist yet. The check runs before the "
+                                         "command, so a file written in the same command cannot be read. "
+                                         "Write the body file in a separate step first, then run gh.")
     except OSError as exc:
         return BodyRef(where, unreadable=f"Cannot read the body file {p}: {exc.strerror or exc}.")
 

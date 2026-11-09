@@ -104,6 +104,12 @@ def test_unrelated_commands_pass(command):
     assert check_tool_call("terminal", {"command": command}) is None
 
 
+def test_body_file_written_in_the_same_command_says_to_split(tmp_path):
+    msg = check_tool_call("terminal", {"command": "echo hi > b.md && gh pr create --body-file b.md",
+                                       "workdir": str(tmp_path)})
+    assert msg and "Write the body file in a separate step first" in msg
+
+
 def test_gh_api_pulls_body_and_mcp_tool_are_checked(tmp_path):
     assert check_tool_call("terminal", {"command": "gh api repos/o/r/pulls/9 -X PATCH -f body=short"})
     (tmp_path / "b.md").write_text(GOOD)

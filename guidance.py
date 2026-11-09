@@ -46,8 +46,10 @@ Every pull request body you write or edit has this shape:
 
 - The summary label names the model and reasoning effort that wrote the details{label_note}.
 - Leave a blank line after </summary> and before </details>, or GitHub shows the Markdown as raw text.
-- Write the body to a file and pass it with `gh pr create --body-file <file>` or \
-`gh pr edit <n> --body-file <file>`. A body built with $(...) or piped from stdin cannot be checked."""
+- Write the body file in its own step (the file tool, or a separate command), then pass it with \
+`gh pr create --body-file <file>` or `gh pr edit <n> --body-file <file>`. The check runs before a \
+command starts, so a file written in the same command, a body built with $(...) or a body piped \
+from stdin cannot be checked and is refused."""
 
 _UPPER = {"gpt", "glm", "llm", "ai", "oss", "vl"}
 
