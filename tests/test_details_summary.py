@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 import textwrap
 
 import pytest
@@ -33,6 +34,13 @@ def test_good_body_passes():
 def test_screenshot_in_opener_is_allowed():
     body = GOOD.replace("catalog.\n", "catalog.\n\n![after](https://example.com/a.png)\n")
     assert check_body(body).ok
+
+
+def test_details_written_as_inline_code_is_not_the_fold():
+    body = GOOD.replace("`hermes update` no longer", "`hermes update` (see `<details><summary>x</summary>`) no longer")
+    report = check_body(body)
+    assert report.ok, report.problems
+    assert report.label == "Claude Opus 5.5 Medium"
 
 
 @pytest.mark.parametrize("body, needle", [
@@ -70,13 +78,23 @@ def test_model_label(model, effort, label):
 
 
 def test_gh_pr_create_with_bad_body_file_is_blocked(tmp_path):
-    (tmp_path / "body.md").write_text("Adds a thing.")
-    msg = check_tool_call("terminal", {"command": f"cd {tmp_path} && gh pr create -t x --body-file body.md"})
+    (tmp_path / "body.md").write_text("Adds a thing.", encoding="utf-8")
+    msg = check_tool_call("terminal", {"command": "gh pr create -t x --body-file body.md",
+                                       "workdir": str(tmp_path)})
     assert msg and "Nothing was sent to GitHub" in msg and "No <details>" in msg
 
 
+def test_cd_and_quoted_absolute_path_are_followed(tmp_path):
+    (tmp_path / "body.md").write_text("Adds a thing.", encoding="utf-8")
+    quoted = shlex.quote(str(tmp_path))
+    msg = check_tool_call("terminal", {"command": f"cd {quoted} && gh pr create --body-file body.md"})
+    assert msg and "No <details>" in msg
+    msg = check_tool_call("terminal", {"command": f'gh pr create --body-file "{tmp_path / "body.md"}"'})
+    assert msg and "No <details>" in msg
+
+
 def test_gh_pr_create_with_good_body_file_passes(tmp_path):
-    (tmp_path / "body.md").write_text(GOOD)
+    (tmp_path / "body.md").write_text(GOOD, encoding="utf-8")
     assert check_tool_call("terminal", {"command": "gh pr create --body-file body.md",
                                         "workdir": str(tmp_path)}) is None
 
@@ -112,8 +130,9 @@ def test_body_file_written_in_the_same_command_says_to_split(tmp_path):
 
 def test_gh_api_pulls_body_and_mcp_tool_are_checked(tmp_path):
     assert check_tool_call("terminal", {"command": "gh api repos/o/r/pulls/9 -X PATCH -f body=short"})
-    (tmp_path / "b.md").write_text(GOOD)
-    assert check_tool_call("terminal", {"command": f"gh api repos/o/r/pulls -F body=@{tmp_path}/b.md"}) is None
+    (tmp_path / "b.md").write_text(GOOD, encoding="utf-8")
+    assert check_tool_call("terminal", {"command": "gh api repos/o/r/pulls -F body=@b.md",
+                                        "workdir": str(tmp_path)}) is None
     assert check_tool_call("mcp__github__create_pull_request", {"body": "no fold"})
     assert check_tool_call("mcp__github__create_pull_request", {"body": GOOD}) is None
     assert check_tool_call("mcp__github__create_issue", {"body": "no fold"}) is None

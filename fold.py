@@ -28,6 +28,8 @@ GENERIC_LABELS = {
 }
 
 _DETAILS_OPEN = re.compile(r"<details\b[^>]*>", re.I)
+_FENCE = re.compile(r"^(```|~~~).*?^\1[ \t]*$", re.M | re.S)
+_INLINE_CODE = re.compile(r"(`+)(?!`).+?(?<!`)\1", re.S)
 _DETAILS_CLOSE = re.compile(r"</details\s*>", re.I)
 _SUMMARY = re.compile(r"\A\s*<summary\b[^>]*>(?P<label>.*?)</summary\s*>", re.I | re.S)
 _COMMENT = re.compile(r"<!--.*?-->", re.S)
@@ -63,6 +65,14 @@ def _words(text: str) -> list[str]:
     return re.findall(r"[\w'’./:-]+", _TAG.sub(" ", text))
 
 
+def _mask_code(text: str) -> str:
+    """Blank out fenced blocks and inline code (same length, so offsets still line up), so a
+    `<details>` written as an example is not taken for the real fold."""
+    blank = lambda m: re.sub(r"[^\n]", " ", m.group(0))  # noqa: E731
+    text = _FENCE.sub(blank, text)
+    return _INLINE_CODE.sub(blank, text)
+
+
 def check_body(body: str, *, max_opener_words: int = DEFAULT_MAX_OPENER_WORDS,
                max_sentence_words: int = DEFAULT_MAX_SENTENCE_WORDS) -> Report:
     report = Report()
@@ -71,7 +81,7 @@ def check_body(body: str, *, max_opener_words: int = DEFAULT_MAX_OPENER_WORDS,
         problems.append("The body is empty. Write an opener, then fold the full description into <details>.")
         return report
 
-    opened = _DETAILS_OPEN.search(body)
+    opened = _DETAILS_OPEN.search(_mask_code(body))
     if opened is None:
         problems.append("No <details> block. Put the full description inside "
                         "<details><summary>MODEL EFFORT</summary> ... </details> below the opener.")
